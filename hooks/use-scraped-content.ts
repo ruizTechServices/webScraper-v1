@@ -9,7 +9,7 @@ interface UseScrapedContentReturn {
   content: ScrapedContent[]
   loading: boolean
   error: Error | null
-  addContent: (url: string, content: Array<{ content: string; text: string }>) => Promise<number | undefined>
+  addContent: (url: string, content: Array<{ content: string; text: string }>) => Promise<number>
   updateContent: (id: string, newContent: string) => Promise<void>
   deleteContent: (id: string) => Promise<void>
   clearAllContent: () => Promise<void>
@@ -42,11 +42,12 @@ export function useScrapedContent(): UseScrapedContentReturn {
   const addContent = useCallback(async (
     url: string,
     newContent: Array<{ content: string; text: string }>
-  ) => {
+  ): Promise<number> => {
     try {
       const id = await db.addContent(url, newContent)
       toast.success('Content added successfully')
-      return id
+      // Ensure we return a number
+      return typeof id === 'number' ? id : parseInt(id as string, 10)
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Failed to add content')
       toast.error(error.message)

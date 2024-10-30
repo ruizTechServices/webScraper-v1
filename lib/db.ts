@@ -27,7 +27,7 @@ export class WebScraperDatabase extends Dexie {
     })
   }
 
-  async addContent(url: string, newContent: Array<{ content: string; text: string }>) {
+  async addContent(url: string, newContent: Array<{ content: string; text: string }>): Promise<number> {
     try {
       const timestamp = new Date()
       const contentWithTimestamp = newContent.map(item => ({
@@ -42,13 +42,14 @@ export class WebScraperDatabase extends Dexie {
           item.content = [...item.content, ...contentWithTimestamp]
           item.timestamp = timestamp
         })
-        return existing.id
+        return existing.id as number
       } else {
-        return await this.scrapedContent.add({
+        const id = await this.scrapedContent.add({
           url,
           content: contentWithTimestamp,
           timestamp
         })
+        return typeof id === 'number' ? id : parseInt(id, 10)
       }
     } catch (error) {
       console.error('Failed to add content:', error)
@@ -56,7 +57,7 @@ export class WebScraperDatabase extends Dexie {
     }
   }
 
-  async deleteContentItem(compositeId: string) {
+  async deleteContentItem(compositeId: string): Promise<void> {
     try {
       const [url, _, contentIndex] = compositeId.split('-')
       const index = parseInt(contentIndex, 10)
@@ -92,7 +93,7 @@ export class WebScraperDatabase extends Dexie {
     }
   }
 
-  async updateContentItem(compositeId: string, newContent: string) {
+  async updateContentItem(compositeId: string, newContent: string): Promise<void> {
     try {
       const [url, _, contentIndex] = compositeId.split('-')
       const index = parseInt(contentIndex, 10)
@@ -128,7 +129,7 @@ export class WebScraperDatabase extends Dexie {
     }
   }
 
-  async getAllContent() {
+  async getAllContent(): Promise<ScrapedContent[]> {
     try {
       return await this.scrapedContent
         .orderBy('timestamp')
@@ -140,7 +141,7 @@ export class WebScraperDatabase extends Dexie {
     }
   }
 
-  async clearAllContent() {
+  async clearAllContent(): Promise<void> {
     try {
       await this.scrapedContent.clear()
     } catch (error) {
