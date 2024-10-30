@@ -1,4 +1,4 @@
-import Dexie, { Table } from 'dexie'
+import Dexie, { Table, IndexableType } from 'dexie'
 
 export interface ScrapedContent {
   id?: number
@@ -27,8 +27,33 @@ export class WebScraperDatabase extends Dexie {
     })
   }
 
+  private parseCompositeId(compositeId: string): { url: string; index: number } {
+    const lastHyphenIndex = compositeId.lastIndexOf('-')
+    if (lastHyphenIndex === -1) {
+      throw new Error('Invalid content identifier format')
+    }
+
+    const secondLastHyphenIndex = compositeId.lastIndexOf('-', lastHyphenIndex - 1)
+    if (secondLastHyphenIndex === -1) {
+      throw new Error('Invalid content identifier format')
+    }
+
+    const url = compositeId.substring(0, secondLastHyphenIndex)
+    const contentIndex = parseInt(compositeId.substring(lastHyphenIndex + 1), 10)
+
+    if (!url || isNaN(contentIndex)) {
+      throw new Error('Invalid content identifier format')
+    }
+
+    return { url, index: contentIndex }
+  }
+
   async addContent(url: string, newContent: Array<{ content: string; text: string }>): Promise<number> {
     try {
+      if (!url || !newContent.length) {
+        throw new Error('Invalid content: URL and content are required')
+      }
+
       const timestamp = new Date()
       const contentWithTimestamp = newContent.map(item => ({
         ...item,
@@ -38,32 +63,50 @@ export class WebScraperDatabase extends Dexie {
       const existing = await this.scrapedContent.where('url').equals(url).first()
 
       if (existing) {
+        if (!existing.id) {
+          throw new Error('Invalid database state: existing record has no ID')
+        }
         await this.scrapedContent.where('url').equals(url).modify(item => {
           item.content = [...item.content, ...contentWithTimestamp]
           item.timestamp = timestamp
         })
-        return existing.id ?? 0
+        return existing.id
       } else {
         const id = await this.scrapedContent.add({
           url,
           content: contentWithTimestamp,
           timestamp
         })
-        return typeof id === 'number' ? id : 0
+
+        if (!id) {
+          throw new Error('Failed to generate database ID')
+        }
+
+        if (typeof id === 'number') {
+          return id
+        } else if (typeof id === 'string') {
+          const numId = parseInt(id, 10)
+          if (isNaN(numId)) {
+            throw new Error('Failed to parse database ID')
+          }
+          return numId
+        } else {
+          throw new Error('Unexpected ID type returned from database')
+        }
       }
     } catch (error) {
       console.error('Failed to add content:', error)
-      throw new Error('Failed to add content to database')
+      throw error instanceof Error ? error : new Error('Failed to add content to database')
     }
-  }  async deleteContentItem(compositeId: string): Promise<void> {
+  }
+
+  async deleteContentItem(compositeId: string): Promise<void> {
     try {
-      const [url, _, contentIndex] = compositeId.split('-')
-      const index = parseInt(contentIndex, 10)
-      
-      if (!url || isNaN(index)) {
-        throw new Error('Invalid content identifier')
+      if (!compositeId) {
+        throw new Error('Content identifier is required')
       }
 
+      const { url, index } = this.parseCompositeId(compositeId)
       const item = await this.scrapedContent.where('url').equals(url).first()
       
       if (!item) {
@@ -71,7 +114,7 @@ export class WebScraperDatabase extends Dexie {
       }
 
       if (index < 0 || index >= item.content.length) {
-        throw new Error(`Invalid content index: ${index}`)
+        throw new Error(`Invalid content index: ${index}. Must be between 0 and ${item.content.length - 1}`)
       }
 
       const newContent = [...item.content]
@@ -87,19 +130,17 @@ export class WebScraperDatabase extends Dexie {
       }
     } catch (error) {
       console.error('Failed to delete content:', error)
-      throw error
+      throw error instanceof Error ? error : new Error('Failed to delete content from database')
     }
   }
 
   async updateContentItem(compositeId: string, newContent: string): Promise<void> {
     try {
-      const [url, _, contentIndex] = compositeId.split('-')
-      const index = parseInt(contentIndex, 10)
-      
-      if (!url || isNaN(index)) {
-        throw new Error('Invalid content identifier')
+      if (!compositeId || typeof newContent !== 'string') {
+        throw new Error('Content identifier and new content are required')
       }
 
+      const { url, index } = this.parseCompositeId(compositeId)
       const item = await this.scrapedContent.where('url').equals(url).first()
       
       if (!item) {
@@ -107,7 +148,7 @@ export class WebScraperDatabase extends Dexie {
       }
 
       if (index < 0 || index >= item.content.length) {
-        throw new Error(`Invalid content index: ${index}`)
+        throw new Error(`Invalid content index: ${index}. Must be between 0 and ${item.content.length - 1}`)
       }
 
       const updatedContent = [...item.content]
@@ -123,19 +164,21 @@ export class WebScraperDatabase extends Dexie {
       })
     } catch (error) {
       console.error('Failed to update content:', error)
-      throw error
+      throw error instanceof Error ? error : new Error('Failed to update content in database')
     }
   }
 
   async getAllContent(): Promise<ScrapedContent[]> {
     try {
-      return await this.scrapedContent
+      const content = await this.scrapedContent
         .orderBy('timestamp')
         .reverse()
         .toArray()
+
+      return content || []
     } catch (error) {
       console.error('Failed to get content:', error)
-      throw new Error('Failed to retrieve content from database')
+      throw error instanceof Error ? error : new Error('Failed to retrieve content from database')
     }
   }
 
@@ -144,7 +187,7 @@ export class WebScraperDatabase extends Dexie {
       await this.scrapedContent.clear()
     } catch (error) {
       console.error('Failed to clear content:', error)
-      throw new Error('Failed to clear database')
+      throw error instanceof Error ? error : new Error('Failed to clear database')
     }
   }
 }
