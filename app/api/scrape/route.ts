@@ -23,6 +23,7 @@ export async function POST(request: Request) {
       );
     }
 
+    // Fetch the HTML page
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -34,10 +35,16 @@ export async function POST(request: Request) {
       next: { revalidate: 0 },
     });
 
+    // Handle HTTP response errors
     if (!response.ok) {
-      throw new Error(`Failed to fetch URL: ${response.status} ${response.statusText}`);
+      console.error(`Failed to fetch URL: ${response.status} - ${response.statusText}`);
+      return NextResponse.json(
+        { error: `Failed to fetch URL: ${response.status} - ${response.statusText}` },
+        { status: response.status }
+      );
     }
 
+    // Check content type
     const contentType = response.headers.get('content-type');
     if (!contentType?.includes('text/html')) {
       return NextResponse.json(
@@ -85,7 +92,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ content });
   } catch (error) {
     console.error('Scraping error:', error);
-    
+
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: error.errors[0].message },
