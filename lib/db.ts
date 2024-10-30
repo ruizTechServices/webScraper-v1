@@ -11,6 +11,12 @@ export interface ScrapedContent {
   timestamp: Date
 }
 
+export interface ContentItem {
+  content: string
+  text: string
+  timestamp: string
+}
+
 export class WebScraperDatabase extends Dexie {
   scrapedContent!: Table<ScrapedContent>
 
@@ -32,14 +38,12 @@ export class WebScraperDatabase extends Dexie {
       const existing = await this.scrapedContent.where('url').equals(url).first()
 
       if (existing) {
-        // Update existing record
         await this.scrapedContent.where('url').equals(url).modify(item => {
           item.content = [...item.content, ...contentWithTimestamp]
           item.timestamp = timestamp
         })
         return existing.id
       } else {
-        // Add new record
         return await this.scrapedContent.add({
           url,
           content: contentWithTimestamp,
@@ -52,22 +56,31 @@ export class WebScraperDatabase extends Dexie {
     }
   }
 
-  async deleteContent(url: string, contentIndex: number) {
+  async deleteContentItem(compositeId: string) {
     try {
+      const [url, _, contentIndex] = compositeId.split('-')
+      const index = parseInt(contentIndex, 10)
+      
+      if (!url || isNaN(index)) {
+        throw new Error('Invalid content identifier')
+      }
+
       const item = await this.scrapedContent.where('url').equals(url).first()
       
       if (!item) {
-        throw new Error('Content not found')
+        throw new Error(`Content not found for URL: ${url}`)
+      }
+
+      if (index < 0 || index >= item.content.length) {
+        throw new Error(`Invalid content index: ${index}`)
       }
 
       const newContent = [...item.content]
-      newContent.splice(contentIndex, 1)
+      newContent.splice(index, 1)
 
       if (newContent.length === 0) {
-        // If no content left, delete the entire record
         await this.scrapedContent.where('url').equals(url).delete()
       } else {
-        // Update with remaining content
         await this.scrapedContent.where('url').equals(url).modify({
           content: newContent,
           timestamp: new Date()
@@ -75,21 +88,32 @@ export class WebScraperDatabase extends Dexie {
       }
     } catch (error) {
       console.error('Failed to delete content:', error)
-      throw new Error('Failed to delete content from database')
+      throw error
     }
   }
 
-  async updateContent(url: string, contentIndex: number, newContent: string) {
+  async updateContentItem(compositeId: string, newContent: string) {
     try {
+      const [url, _, contentIndex] = compositeId.split('-')
+      const index = parseInt(contentIndex, 10)
+      
+      if (!url || isNaN(index)) {
+        throw new Error('Invalid content identifier')
+      }
+
       const item = await this.scrapedContent.where('url').equals(url).first()
       
       if (!item) {
-        throw new Error('Content not found')
+        throw new Error(`Content not found for URL: ${url}`)
+      }
+
+      if (index < 0 || index >= item.content.length) {
+        throw new Error(`Invalid content index: ${index}`)
       }
 
       const updatedContent = [...item.content]
-      updatedContent[contentIndex] = {
-        ...updatedContent[contentIndex],
+      updatedContent[index] = {
+        ...updatedContent[index],
         content: newContent,
         timestamp: new Date().toISOString()
       }
@@ -100,7 +124,7 @@ export class WebScraperDatabase extends Dexie {
       })
     } catch (error) {
       console.error('Failed to update content:', error)
-      throw new Error('Failed to update content in database')
+      throw error
     }
   }
 

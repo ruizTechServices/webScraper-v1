@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, type ScrapedContent } from '@/lib/db'
+import { db, type ScrapedContent, type ContentItem } from '@/lib/db'
 import { toast } from 'sonner'
 
 interface UseScrapedContentReturn {
@@ -10,8 +10,8 @@ interface UseScrapedContentReturn {
   loading: boolean
   error: Error | null
   addContent: (url: string, content: Array<{ content: string; text: string }>) => Promise<number | undefined>
-  updateContent: (url: string, contentIndex: number, newContent: string) => Promise<void>
-  deleteContent: (url: string, contentIndex: number) => Promise<void>
+  updateContent: (id: string, newContent: string) => Promise<void>
+  deleteContent: (id: string) => Promise<void>
   clearAllContent: () => Promise<void>
 }
 
@@ -19,7 +19,6 @@ export function useScrapedContent(): UseScrapedContentReturn {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
 
-  // Fetch content with live updates
   const content = useLiveQuery(
     async () => {
       try {
@@ -34,14 +33,12 @@ export function useScrapedContent(): UseScrapedContentReturn {
     []
   )
 
-  // Update loading state when content changes
   useEffect(() => {
     if (content !== undefined) {
       setLoading(false)
     }
   }, [content])
 
-  // Add new content
   const addContent = useCallback(async (
     url: string,
     newContent: Array<{ content: string; text: string }>
@@ -58,14 +55,9 @@ export function useScrapedContent(): UseScrapedContentReturn {
     }
   }, [])
 
-  // Update existing content
-  const updateContent = useCallback(async (
-    url: string,
-    contentIndex: number,
-    newContent: string
-  ) => {
+  const updateContent = useCallback(async (id: string, newContent: string) => {
     try {
-      await db.updateContent(url, contentIndex, newContent)
+      await db.updateContentItem(id, newContent)
       toast.success('Content updated successfully')
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Failed to update content')
@@ -75,13 +67,9 @@ export function useScrapedContent(): UseScrapedContentReturn {
     }
   }, [])
 
-  // Delete content
-  const deleteContent = useCallback(async (
-    url: string,
-    contentIndex: number
-  ) => {
+  const deleteContent = useCallback(async (id: string) => {
     try {
-      await db.deleteContent(url, contentIndex)
+      await db.deleteContentItem(id)
       toast.success('Content deleted successfully')
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Failed to delete content')
@@ -91,7 +79,6 @@ export function useScrapedContent(): UseScrapedContentReturn {
     }
   }, [])
 
-  // Clear all content
   const clearAllContent = useCallback(async () => {
     try {
       await db.clearAllContent()

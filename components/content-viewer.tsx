@@ -69,13 +69,11 @@ export function ContentViewer() {
 
   const saveEdit = async (id: string) => {
     try {
-      const options = { notify: true }  // Adjust this based on what the third argument should be
-      await updateContent(id, editContent, options)  // Providing the third argument here
+      await updateContent(id, editContent)
       setEditingId(null)
       setEditContent('')
-      toast.success('Content updated successfully')
     } catch (error) {
-      toast.error('Failed to update content')
+      // Error handling is done in the hook
     }
   }
 
@@ -91,9 +89,10 @@ export function ContentViewer() {
       await deleteContent(itemToDelete)
       setDeleteDialogOpen(false)
       setItemToDelete(null)
-      toast.success('Content deleted successfully')
     } catch (error) {
-      toast.error('Failed to delete content')
+      // Error handling is done in the hook
+      setDeleteDialogOpen(false)
+      setItemToDelete(null)
     }
   }
 
@@ -196,6 +195,7 @@ export function ContentViewer() {
                 <CollapsibleContent className="mt-4">
                   {editingId === item.id ? (
                     <div className="space-y-4">
+                      
                       <Textarea
                         value={editContent}
                         onChange={(e) => setEditContent(e.target.value)}
