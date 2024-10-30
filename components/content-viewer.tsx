@@ -69,7 +69,8 @@ export function ContentViewer() {
 
   const saveEdit = async (id: string) => {
     try {
-      await updateContent(id, editContent)
+      const options = { notify: true }  // Adjust this based on what the third argument should be
+      await updateContent(id, editContent, options)  // Providing the third argument here
       setEditingId(null)
       setEditContent('')
       toast.success('Content updated successfully')
