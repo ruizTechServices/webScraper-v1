@@ -42,22 +42,20 @@ export class WebScraperDatabase extends Dexie {
           item.content = [...item.content, ...contentWithTimestamp]
           item.timestamp = timestamp
         })
-        return existing.id as number
+        return existing.id ?? 0
       } else {
         const id = await this.scrapedContent.add({
           url,
           content: contentWithTimestamp,
           timestamp
         })
-        return typeof id === 'number' ? id : parseInt(id, 10)
+        return typeof id === 'number' ? id : 0
       }
     } catch (error) {
       console.error('Failed to add content:', error)
       throw new Error('Failed to add content to database')
     }
-  }
-
-  async deleteContentItem(compositeId: string): Promise<void> {
+  }  async deleteContentItem(compositeId: string): Promise<void> {
     try {
       const [url, _, contentIndex] = compositeId.split('-')
       const index = parseInt(contentIndex, 10)
